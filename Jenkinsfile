@@ -5,13 +5,7 @@ pipeline {
      tools {
         maven 'apache-maven-3.5.3' 
     }
-    stages {
-        stage('Example') {
-            steps {
-                sh 'mvn --version'
-            }
-        }
-    }
+  
     
     //{ label 'java8' }
     // global env variables
@@ -19,6 +13,14 @@ pipeline {
         EMAIL_RECIPIENTS = 'mahmoud.romeh@test.com'
     }
     stages {
+        
+    
+        stage('Check mvn') {
+            steps {
+                sh 'mvn --version'
+            }
+        }
+ 
 
         stage('Build with unit testing') {
             steps {
