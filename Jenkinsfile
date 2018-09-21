@@ -1,6 +1,6 @@
 pipeline {
     // run on jenkins nodes tha has java 8 label
-    agent 
+    agent any
     //{ label 'java8' }
     // global env variables
     environment {
