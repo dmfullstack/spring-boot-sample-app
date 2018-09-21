@@ -1,6 +1,18 @@
 pipeline {
     // run on jenkins nodes tha has java 8 label
     agent any
+    
+     tools {
+        maven 'apache-maven-3.0.1' 
+    }
+    stages {
+        stage('Example') {
+            steps {
+                sh 'mvn --version'
+            }
+        }
+    }
+    
     //{ label 'java8' }
     // global env variables
     environment {
@@ -16,7 +28,10 @@ pipeline {
                     // ** NOTE: This 'M3' Maven tool must be configured
                     // **       in the global configuration.
                     echo 'Pulling...' + env.BRANCH_NAME
-                    def mvnHome = tool 'Maven 3.3.9'
+                    tools {
+                        maven 'M3'
+                      }
+                    //def mvnHome = tool 'Maven 3.3.9'
                     if (isUnix()) {
                         def targetVersion = getDevVersion()
                         print 'target build version...'
