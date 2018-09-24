@@ -173,8 +173,9 @@ pipeline {
             }
         }
         stage('Release and publish artifact') {
+            
             when {
-                echo 'INSIDE Release and publish artifact'
+               
                 // check if branch is master
                 branch 'master'
          
@@ -182,6 +183,7 @@ pipeline {
             steps {
                 // create the release version then create a tage with it , then push to nexus releases the released jar
                 script {
+                     echo 'INSIDE Release and publish artifact'
                     //def mvnHome = tool 'Maven 3.3.9' //
                     if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
                         def v = getReleaseVersion()
@@ -206,12 +208,13 @@ pipeline {
         }
         stage('Deploy to Acceptance') {
             when {
-                       echo 'INSIDE Deploy to Acceptance'
+                       
                 // check if branch is master
                 branch 'master'
             }
             steps {
                 script {
+                    echo 'INSIDE Deploy to Acceptance'
                     if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
                         timeout(time: 3, unit: 'MINUTES') {
                             //input message:'Approve deployment?', submitter: 'it-ops'
@@ -239,11 +242,12 @@ pipeline {
         }
         stage('ACC E2E tests') {
             when {
-                echo 'INSIDE CC E2E tests'
+               
                 // check if branch is master
                 branch 'master'
             }
             steps {
+                 echo 'INSIDE CC E2E tests'
                 // give some time till the deployment is done, so we wait 45 seconds
                 sleep(45)
                 script {
