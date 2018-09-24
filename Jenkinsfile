@@ -42,7 +42,7 @@ pipeline {
                         //sh "'${mvnHome}/bin/mvn' -Dintegration-tests.skip=true -Dbuild.number=${targetVersion} clean package"
                         sh "'mvn' -Dintegration-tests.skip=true -Dbuild.number=${targetVersion} clean package"
                         echo 'Build Complete, getting pom details'
-                        def pom = readMavenPom file: 'pom.xml'
+                        //def pom = readMavenPom file: 'pom.xml'
                         // get the current development version
                         //developmentArtifactVersion = "${pom.version}-${targetVersion}"
                         developmentArtifactVersion = "1.1-1.1"
