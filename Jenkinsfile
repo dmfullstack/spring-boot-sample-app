@@ -126,6 +126,7 @@ pipeline {
         stage('Development deploy approval and deployment') {
             steps {
                 script {
+                    echo 'INSIDE Development deploy approval and deployment'
                     if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
                         timeout(time: 3, unit: 'MINUTES') {
                             // you can use the commented line if u have specific user group who CAN ONLY approve
@@ -144,6 +145,7 @@ pipeline {
                             } else {
                                 error 'the application is not  deployed as development version is null!'
                             }
+                            echo 'Exiting Development deploy approval and deployment'
 
                         }
                     }
@@ -152,11 +154,12 @@ pipeline {
         }
         stage('DEV sanity check') {
             steps {
+                echo 'INSIDE DEV sanity check'
                 // give some time till the deployment is done, so we wait 45 seconds
                 sleep(45)
                 script {
                     if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                        timeout(time: 1, unit: 'MINUTES') {
+                        timeout(time: 11, unit: 'MINUTES') {
                             script {
                                 //def mvnHome = tool 'Maven 3.3.9'
                                 //NOTE : if u change the sanity test class name , change it here as well
@@ -164,14 +167,17 @@ pipeline {
                             }
 
                         }
+                       echo 'LEAVING DEV sanity check'
                     }
                 }
             }
         }
         stage('Release and publish artifact') {
             when {
+                echo 'INSIDE Release and publish artifact'
                 // check if branch is master
                 branch 'master'
+         
             }
             steps {
                 // create the release version then create a tage with it , then push to nexus releases the released jar
@@ -195,10 +201,12 @@ pipeline {
                         error "Release is not possible. as build is not successful"
                     }
                 }
+                       echo 'LEAVING Release and publish artifact'
             }
         }
         stage('Deploy to Acceptance') {
             when {
+                       echo 'INSIDE Deploy to Acceptance'
                 // check if branch is master
                 branch 'master'
             }
@@ -224,12 +232,14 @@ pipeline {
                             }
 
                         }
+                        echo 'LEAVING Deploy to Acceptance'
                     }
                 }
             }
         }
         stage('ACC E2E tests') {
             when {
+                echo 'INSIDE CC E2E tests'
                 // check if branch is master
                 branch 'master'
             }
@@ -247,6 +257,7 @@ pipeline {
                             }
 
                         }
+                         echo 'LEAVING CC E2E tests'
                     }
                 }
             }
