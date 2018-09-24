@@ -41,9 +41,11 @@ pipeline {
                         print targetVersion
                         //sh "'${mvnHome}/bin/mvn' -Dintegration-tests.skip=true -Dbuild.number=${targetVersion} clean package"
                         sh "'mvn' -Dintegration-tests.skip=true -Dbuild.number=${targetVersion} clean package"
+                        echo 'Build Complete, getting pom details'
                         def pom = readMavenPom file: 'pom.xml'
                         // get the current development version
                         developmentArtifactVersion = "${pom.version}-${targetVersion}"
+                        echo 'POM Version:'
                         print pom.version
                         echo 'Before junit testing'
                         // execute the unit testing and collect the reports
