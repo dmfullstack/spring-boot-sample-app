@@ -29,6 +29,7 @@ pipeline {
                     // Get the Maven tool.
                     // ** NOTE: This 'M3' Maven tool must be configured
                     // **       in the global configuration.
+                    echo 'INside Build with unit testing'
                     echo 'Pulling...' + env.BRANCH_NAME
                     //tools {
                     //    maven 'M3'
@@ -44,15 +45,19 @@ pipeline {
                         // get the current development version
                         developmentArtifactVersion = "${pom.version}-${targetVersion}"
                         print pom.version
+                        echo 'Before junit testing'
                         // execute the unit testing and collect the reports
                         junit '**//*target/surefire-reports/TEST-*.xml'
                         archive 'target*//*.jar'
+                        echo 'Leaving  Build with unit testing'
                     } else {
+                        echo 'ELSE inside part Build with unit testing'
                         bat(/"mvn" -Dintegration-tests.skip=true clean package/)
                         def pom = readMavenPom file: 'pom.xml'
                         print pom.version
                         junit '**//*target/surefire-reports/TEST-*.xml'
                         archive 'target*//*.jar'
+                        echo 'Leaving ELSE part Build with unit testing'
                     }
                 }
 
@@ -62,22 +67,29 @@ pipeline {
             // Run integration test
             steps {
                 script {
+                    echo 'INSIDE Integration tests'
                     //def mvnHome = tool 'Maven 3.3.9'
                     if (isUnix()) {
                         // just to trigger the integration test without unit testing
                         sh "'mvn'  verify -Dunit-tests.skip=true"
+                           echo 'LEAVING Integration tests'
                     } else {
+                        echo 'ELSE INSIDE Integration tests'
                         bat(/"mvn" verify -Dunit-tests.skip=true/)
+                        echo 'ELSE leaving Integration tests'
                     }
 
                 }
+                echo 'BEFORE cucumber reports collection'
                 // cucumber reports collection
                 cucumber buildStatus: null, fileIncludePattern: '**/cucumber.json', jsonReportDirectory: 'target', sortingMethod: 'ALPHABETICAL'
+                echo 'AFTER cucumber reports collection'
             }
         }
         stage('Sonar scan execution') {
             // Run the sonar scan
             steps {
+                echo 'INSIDE Sonar scan execution'
                 script {
                     //def mvnHome = tool 'Maven 3.3.9'
                     withSonarQubeEnv {
@@ -85,11 +97,13 @@ pipeline {
                         sh "'mvn'  verify sonar:sonar -Dintegration-tests.skip=true -Dmaven.test.failure.ignore=true"
                     }
                 }
+                  echo 'LEAVING Sonar scan execution'
             }
         }
         // waiting for sonar results based into the configured web hook in Sonar server which push the status back to jenkins
         stage('Sonar scan result check') {
             steps {
+                echo 'INSIDE Sonar scan result check'
                 timeout(time: 2, unit: 'MINUTES') {
                     retry(3) {
                         script {
@@ -97,6 +111,7 @@ pipeline {
                             if (qg.status != 'OK') {
                                 error "Pipeline aborted due to quality gate failure: ${qg.status}"
                             }
+                            echo 'LEAVING Sonar scan result check'
                         }
                     }
                 }
