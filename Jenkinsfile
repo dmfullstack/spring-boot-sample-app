@@ -237,13 +237,16 @@ pipeline {
             deleteDir()
         }
         success {
+            print "Successful"
             //sendEmail("Successful");
         }
         unstable {
             //sendEmail("Unstable");
+            print "Unstable"
         }
         failure {
             //sendEmail("Failed");
+            print "Failed"
         }
     }
 
