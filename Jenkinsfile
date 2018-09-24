@@ -1,385 +1,250 @@
 pipeline {
-    // run on jenkins nodes tha has java 8 label
-    agent any
-    
-  //   tools {
-  //      maven 'apache-maven-3.5.3' 
-   // }
-  
-    
-    //{ label 'java8' }
-    // global env variables
-    //environment {
-    //    EMAIL_RECIPIENTS = 'mahmoud.romeh@test.com'
-    //}
-    stages {
-        
-    
-        stage('Check mvn') {
-            steps {
-                sh 'mvn --version'
-            }
-        }
- 
+	agent any
+	tools {
+		// TODO: how to make this parametrizable?
+		jdk "jdk8"
+	}
+	stages {
+		stage("Build and Upload") {
+			steps {
+				checkout([
+					$class: 'GitSCM',
+					clearWorkspace: true,
+					branches: [
+						[name: "*/${env.GIT_BRANCH_NAME ?: 'master'}"]
+					],
+					extensions: [
+						[$class: 'WipeWorkspace'],
+					],
+					userRemoteConfigs: [
+						[credentialsId: Boolean.parseBoolean(env.GIT_USE_SSH_KEY) == Boolean.TRUE ?
+							env.GIT_SSH_CREDENTIAL_ID : env.GIT_CREDENTIAL_ID, url: env.GIT_REPOSITORY]
+					]
+				])
 
-        stage('Build with unit testing') {
-            steps {
-                // Run the maven build
-                script {
-                    // Get the Maven tool.
-                    // ** NOTE: This 'M3' Maven tool must be configured
-                    // **       in the global configuration.
-                    echo 'INside Build with unit testing'
-                    echo 'Pulling...' + env.BRANCH_NAME
-                    //tools {
-                    //    maven 'M3'
-                     // }
-                    //def mvnHome = tool 'Maven 3.3.9'
-                    if (isUnix()) {
-                        def targetVersion = getDevVersion()
-                        print 'target build version...'
-                        print targetVersion
-                        //sh "'${mvnHome}/bin/mvn' -Dintegration-tests.skip=true -Dbuild.number=${targetVersion} clean package"
-                        sh "'mvn' -Dintegration-tests.skip=true -Dbuild.number=${targetVersion} clean package"
-                        echo 'Build Complete, getting pom details'
-                        //def pom = readMavenPom file: 'pom.xml'
-                        // get the current development version
-                        //developmentArtifactVersion = "${pom.version}-${targetVersion}"
-                        developmentArtifactVersion = "1.1-1.1"
-                        echo 'developmentArtifactVersion:'
-                        print developmentArtifactVersion
-                        //print pom.version
-                        echo 'Before junit testing'
-                        // execute the unit testing and collect the reports
-                        //junit '**//*target/surefire-reports/TEST-*.xml'
-                        archive 'target*//*.jar'
-                        echo 'Leaving  Build with unit testing'
-                    } else {
-                        echo 'ELSE inside part Build with unit testing'
-                        bat(/"mvn" -Dintegration-tests.skip=true clean package/)
-                        def pom = readMavenPom file: 'pom.xml'
-                        print pom.version
-                        junit '**//*target/surefire-reports/TEST-*.xml'
-                        archive 'target*//*.jar'
-                        echo 'Leaving ELSE part Build with unit testing'
-                    }
-                }
+				checkout([
+					$class: 'GitSCM',
+					branches: [
+						[name: "*/${env.TOOLS_BRANCH}"]
+					],
+					extensions: [
+						[$class: 'WipeWorkspace'],
+						[$class: 'RelativeTargetDirectory', relativeTargetDir: "${env.WORKSPACE}@tools"]
+					],
+					userRemoteConfigs: [
+						[credentialsId: env.GIT_CREDENTIAL_ID, url: env.TOOLS_REPOSITORY]
+					]
+				])
 
-            }
-        }
-        stage('Integration tests') {
-            // Run integration test
-            steps {
-                script {
-                    echo 'INSIDE Integration tests'
-                    //def mvnHome = tool 'Maven 3.3.9'
-                    if (isUnix()) {
-                        // just to trigger the integration test without unit testing
-                        sh "'mvn'  verify -Dunit-tests.skip=true"
-                           echo 'LEAVING Integration tests'
-                    } else {
-                        echo 'ELSE INSIDE Integration tests'
-                        bat(/"mvn" verify -Dunit-tests.skip=true/)
-                        echo 'ELSE leaving Integration tests'
-                    }
+				script {
+					if (!env.PIPELINE_VERSION) {
+						env.PIPELINE_VERSION = VersionNumber(
+							versionNumberString: env.PIPELINE_VERSION_FORMAT ?: '${BUILD_DATE_FORMATTED, \"yyMMdd_HHmmss\"}-VERSION',
+							versionPrefix: env.PIPELINE_VERSION_PREFIX ?: '1.0.0.M1-'
+						)
+					}
 
-                }
-                echo 'BEFORE cucumber reports collection'
-                // cucumber reports collection
-                //cucumber buildStatus: null, fileIncludePattern: '**/cucumber.json', jsonReportDirectory: 'target', sortingMethod: 'ALPHABETICAL'
-                echo 'AFTER cucumber reports collection'
-            }
-        }
-        stage('Sonar scan execution') {
-            // Run the sonar scan
-            steps {
-                echo 'INSIDE Sonar scan execution'
-                script {
-                    //def mvnHome = tool 'Maven 3.3.9'
-                   // withSonarQubeEnv {
-                        
-                        echo 'withSonarQubeEnv'
+					if (env.REPO_WITH_BINARIES_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.REPO_WITH_BINARIES_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.M2_SETTINGS_REPO_USERNAME = USER
+							env.M2_SETTINGS_REPO_PASSWORD = PASS
+						}
+					}
 
-                        //sh "'mvn'  verify sonar:sonar -Dintegration-tests.skip=true -Dmaven.test.failure.ignore=true"
-                    //}
-                }
-                  echo 'LEAVING Sonar scan execution'
-            }
-        }
-        // waiting for sonar results based into the configured web hook in Sonar server which push the status back to jenkins
-        stage('Sonar scan result check') {
-            steps {
-                echo 'INSIDE Sonar scan result check'
-                //timeout(time: 2, unit: 'MINUTES') {
-               //     retry(3) {
-                //        script {
-                  //          def qg = waitForQualityGate()
-                  //          if (qg.status != 'OK') {
-                  //              error "Pipeline aborted due to quality gate failure: ${qg.status}"
-                   //         }
-                            echo 'LEAVING Sonar scan result check'
-                     //   }
-                  //  }
-               // }
-            }
-        }
-        stage('Development deploy approval and deployment') {
-            steps {
-                script {
-                    echo 'INSIDE Development deploy approval and deployment'
-                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                        timeout(time: 3, unit: 'MINUTES') {
-                            // you can use the commented line if u have specific user group who CAN ONLY approve
-                            //input message:'Approve deployment?', submitter: 'it-ops'
-                            input message: 'Approve deployment?'
-                        }
-                        timeout(time: 2, unit: 'MINUTES') {
-                            //
-                            if (developmentArtifactVersion != null && !developmentArtifactVersion.isEmpty()) {
-                                // replace it with your application name or make it easily loaded from pom.xml
-                                def jarName = "application-${developmentArtifactVersion}.jar"
-                                echo "the application is deploying ${jarName}"
-                                // NOTE : CREATE your deployemnt JOB, where it can take parameters whoch is the jar name to fetch from jenkins workspace
-                                //build job: 'ApplicationToDev', parameters: [[$class: 'StringParameterValue', name: 'jarName', value: jarName]]
-                                echo 'the application is deployed !'
-                            } else {
-                                error 'the application is not  deployed as development version is null!'
-                            }
-                            echo 'Exiting Development deploy approval and deployment'
+					// remove::start[CF]
+					if (env.PAAS_TEST_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.PAAS_TEST_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.PAAS_TEST_USERNAME = USER
+							env.PAAS_TEST_PASSWORD = PASS
+						}
+					}
 
-                        }
-                    }
-                }
-            }
-        }
-        stage('DEV sanity check') {
-            steps {
-                echo 'INSIDE DEV sanity check'
-                // give some time till the deployment is done, so we wait 45 seconds
-                sleep(45)
-                script {
-                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                        timeout(time: 11, unit: 'MINUTES') {
-                            script {
-                                //def mvnHome = tool 'Maven 3.3.9'
-                                //NOTE : if u change the sanity test class name , change it here as well
-                                sh "'mvn' -Dtest=ApplicationSanityCheck_ITT surefire:test"
-                            }
+					if (env.PAAS_STAGE_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.PAAS_STAGE_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.PAAS_STAGE_USERNAME = USER
+							env.PAAS_STAGE_PASSWORD = PASS
+						}
+					}
 
-                        }
-                       echo 'LEAVING DEV sanity check'
-                    }
-                }
-            }
-        }
-        stage('Release and publish artifact') {
-            
-            when {
-               
-                // check if branch is master
-                branch 'master'
-         
-            }
-            steps {
-                // create the release version then create a tage with it , then push to nexus releases the released jar
-                script {
-                     echo 'INSIDE Release and publish artifact'
-                    //def mvnHome = tool 'Maven 3.3.9' //
-                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                        def v = getReleaseVersion()
-                        releasedVersion = v;
-                        if (v) {
-                            echo "Building version ${v} - so released version is ${releasedVersion}"
-                        }
-                        // jenkins user credentials ID which is transparent to the user and password change
-                        sshagent(['0000000-3b5a-454e-a8e6-c6b6114d36000']) {
-                            sh "git tag -f v${v}"
-                            sh "git push -f --tags"
-                        }
-                        sh "'mvn' -Dmaven.test.skip=true  versions:set  -DgenerateBackupPoms=false -DnewVersion=${v}"
-                        sh "'mvn' -Dmaven.test.skip=true clean deploy"
+					if (env.PAAS_PROD_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.PAAS_PROD_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.PAAS_PROD_USERNAME = USER
+							env.PAAS_PROD_PASSWORD = PASS
+						}
+					}
+					// remove::end[CF]
 
-                    } else {
-                        error "Release is not possible. as build is not successful"
-                    }
-                }
-                       echo 'LEAVING Release and publish artifact'
-            }
-        }
-        stage('Deploy to Acceptance') {
-            when {
-                       
-                // check if branch is master
-                branch 'master'
-            }
-            steps {
-                script {
-                    echo 'INSIDE Deploy to Acceptance'
-                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                        timeout(time: 3, unit: 'MINUTES') {
-                            //input message:'Approve deployment?', submitter: 'it-ops'
-                            input message: 'Approve deployment to UAT?'
-                        }
-                        timeout(time: 3, unit: 'MINUTES') {
-                            //  deployment job which will take the relasesed version
-                            if (releasedVersion != null && !releasedVersion.isEmpty()) {
-                                // make the applciation name for the jar configurable
-                                def jarName = "application-${releasedVersion}.jar"
-                                echo "the application is deploying ${jarName}"
-                                // NOTE : DO NOT FORGET to create your UAT deployment jar , check Job AlertManagerToUAT in Jenkins for reference
-                                // the deployemnt should be based into Nexus repo
-                                build job: 'AApplicationToACC', parameters: [[$class: 'StringParameterValue', name: 'jarName', value: jarName], [$class: 'StringParameterValue', name: 'appVersion', value: releasedVersion]]
-                                echo 'the application is deployed !'
-                            } else {
-                                error 'the application is not  deployed as released version is null!'
-                            }
+					if (env.GIT_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.GIT_USERNAME = USER
+							env.GIT_PASSWORD = PASS
+						}
+					}
 
-                        }
-                        echo 'LEAVING Deploy to Acceptance'
-                    }
-                }
-            }
-        }
-        stage('ACC E2E tests') {
-            when {
-               
-                // check if branch is master
-                branch 'master'
-            }
-            steps {
-                 echo 'INSIDE CC E2E tests'
-                // give some time till the deployment is done, so we wait 45 seconds
-                sleep(45)
-                script {
-                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                        timeout(time: 1, unit: 'MINUTES') {
+					// remove::start[K8S]
+					if (env.DOCKER_REGISTRY_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.DOCKER_REGISTRY_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.DOCKER_USERNAME = USER
+							env.DOCKER_PASSWORD = PASS
+						}
+					}
+					if (env.MYSQL_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.MYSQL_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.MYSQL_USER = USER
+							env.MYSQL_PASSWORD = PASS
+						}
+					}
 
-                            script {
-                                //def mvnHome = tool 'Maven 3.3.9'
-                                // NOTE : if you change the test class name change it here as well
-                                sh "'mvn' -Dtest=ApplicationE2E surefire:test"
-                            }
+					if (env.MYSQL_ROOT_CREDENTIAL_ID) {
+						withCredentials([usernamePassword(credentialsId: env.MYSQL_ROOT_CREDENTIAL_ID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							env.MYSQL_ROOT_USER = USER
+							env.MYSQL_ROOT_PASSWORD = PASS
+						}
+					}
+					// remove::end[K8S]
 
-                        }
-                         echo 'LEAVING CC E2E tests'
-                    }
-                }
-            }
-        }
-    }
-    post {
-        // Always runs. And it runs before any of the other post conditions.
-        always {
-            // Let's wipe out the workspace before we finish!
-            deleteDir()
-        }
-        success {
-            print "Successful"
-            //sendEmail("Successful");
-        }
-        unstable {
-            //sendEmail("Unstable");
-            print "Unstable"
-        }
-        failure {
-            //sendEmail("Failed");
-            print "Failed"
-        }
-    }
+					env.DEPLOY_TO_PROD = input message: '', parameters: [
+						choice(
+							name: 'Deploy to prod?',
+							choices: 'no\nyes',
+							description: 'Choose "yes" if you want to deploy this build to production'
+						)
+					]
+				}
+				sh """#!/bin/bash
+				${
+					if (Boolean.parseBoolean(env.GIT_USE_SSH_KEY) == Boolean.TRUE) {
+						return """
+						eval "\$(ssh-agent -s)"
+						ssh-add /usr/share/jenkins/gitsshkey
+						"""
+					}	
+				}
+				\${WORKSPACE}@tools/common/src/main/bash/build_and_upload.sh
+				"""
+			}
+		}
 
-// The options directive is for configuration that applies to the whole job.
-    options {
-        // For example, we'd like to make sure we only keep 10 builds at a time, so
-        // we don't fill up our storage!
-        buildDiscarder(logRotator(numToKeepStr: '5'))
+		stage("API compatibility check") {
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/build_api_compatibility_check.sh
+				'''
+			}
+		}
 
-        // And we'd really like to be sure that this build doesn't hang forever, so
-        // let's time it out after an hour.
-        timeout(time: 25, unit: 'MINUTES')
-    }
+		stage("Deploy to test") {
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/test_deploy.sh
+				'''
+			}
+		}
 
+		stage("Tests on test") {
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/test_smoke.sh
+				'''
+			}
+		}
+
+		stage("Deploy to test latest prod version") {
+			when {
+				environment name: 'DB_ROLLBACK_STEP_REQUIRED',
+					value: 'true'
+			}
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/test_rollback_deploy.sh
+				'''
+			}
+		}
+
+		stage("Tests on test latest prod version") {
+			when {
+				environment name: 'DB_ROLLBACK_STEP_REQUIRED',
+					value: 'true'
+			}
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/test_rollback_smoke.sh
+				'''
+			}
+		}
+
+		stage("Deploy to stage") {
+			when {
+				environment name: 'DEPLOY_TO_STAGE_STEP_REQUIRED',
+					value: 'true'
+			}
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/stage_deploy.sh
+				'''
+			}
+		}
+
+		stage("End to end tests on stage") {
+			when {
+				environment name: 'DEPLOY_TO_STAGE_STEP_REQUIRED',
+					value: 'true'
+			}
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/stage_e2e.sh
+				'''
+			}
+		}
+
+		stage("Deploy to prod") {
+			when {
+				environment name: 'DEPLOY_TO_PROD',
+				value: 'yes'
+			}
+			steps {
+				sh """
+					${
+						if (Boolean.parseBoolean(env.GIT_USE_SSH_KEY) == Boolean.TRUE) {
+							return """
+							eval "\$(ssh-agent -s)"
+							ssh-add /usr/share/jenkins/gitsshkey
+							"""
+						} else {
+							return """
+							# https://issues.jenkins-ci.org/browse/JENKINS-28335
+							git config --local credential.helper cache
+							echo 'protocol=https\nhost=github.com\nusername=${GIT_USERNAME}\npassword=${GIT_PASSWORD}\n\n' | git credential approve
+							"""
+						}
+					}
+					git tag prod/${env.PROJECT_NAME}/\${PIPELINE_VERSION}
+					git push --tags
+					"""
+
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/prod_deploy.sh
+				'''
+			}
+		}
+
+		stage("Complete switch over") {
+			when {
+				environment name: 'DEPLOY_TO_PROD',
+				value: 'yes'
+			}
+			steps {
+				sh '''#!/bin/bash
+				${WORKSPACE}@tools/common/src/main/bash/prod_complete.sh
+				'''
+			}
+		}
+	}
+	post {
+		always {
+			junit '**/surefire-reports/*.xml,**/test-results/**/*.xml'
+			archive "**/build/**/k8s/*.yml"
+			archive "**/target/**/k8s/*.yml"
+		}
+	}
 }
-def developmentArtifactVersion = ''
-def releasedVersion = ''
-// get change log to be send over the mail
-@NonCPS
-def getChangeString() {
-    MAX_MSG_LEN = 100
-    def changeString = ""
-
-    echo "Gathering SCM changes"
-    def changeLogSets = currentBuild.changeSets
-    for (int i = 0; i < changeLogSets.size(); i++) {
-        def entries = changeLogSets[i].items
-        for (int j = 0; j < entries.length; j++) {
-            def entry = entries[j]
-            truncated_msg = entry.msg.take(MAX_MSG_LEN)
-            changeString += " - ${truncated_msg} [${entry.author}]\n"
-        }
-    }
-
-    if (!changeString) {
-        changeString = " - No new changes"
-    }
-    return changeString
-}
-
-def sendEmail(status) {
-    mail(
-            to: "$EMAIL_RECIPIENTS",
-            subject: "Build $BUILD_NUMBER - " + status + " (${currentBuild.fullDisplayName})",
-            body: "Changes:\n " + getChangeString() + "\n\n Check console output at: $BUILD_URL/console" + "\n")
-}
-
-def getDevVersion() {
-    def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
-    def versionNumber;
-    if (gitCommit == null) {
-        versionNumber = env.BUILD_NUMBER;
-    } else {
-        versionNumber = gitCommit.take(8);
-    }
-    print 'build  versions...'
-    print versionNumber
-    return versionNumber
-}
-
-def getReleaseVersion() {
-    def pom = readMavenPom file: 'pom.xml'
-    def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
-    def versionNumber;
-    if (gitCommit == null) {
-        versionNumber = env.BUILD_NUMBER;
-    } else {
-        versionNumber = gitCommit.take(8);
-    }
-    return pom.version.replace("-SNAPSHOT", ".${versionNumber}")
-}
-
-// if you want parallel execution , check below :
-/* stage('Quality Gate(Integration Tests and Sonar Scan)') {
-           // Run the maven build
-           steps {
-               parallel(
-                       IntegrationTest: {
-                           script {
-                               def mvnHome = tool 'Maven 3.3.9'
-                               if (isUnix()) {
-                                   sh "'${mvnHome}/bin/mvn'  verify -Dunit-tests.skip=true"
-                               } else {
-                                   bat(/"${mvnHome}\bin\mvn" verify -Dunit-tests.skip=true/)
-                               }
-                           }
-                       },
-                       SonarCheck: {
-                           script {
-                               def mvnHome = tool 'Maven 3.3.9'
-                               withSonarQubeEnv {
-                                   // sh "'${mvnHome}/bin/mvn'  verify sonar:sonar -Dsonar.host.url=http://bicsjava.bc/sonar/ -Dmaven.test.failure.ignore=true"
-                                   sh "'${mvnHome}/bin/mvn'  verify sonar:sonar -Dmaven.test.failure.ignore=true"
-                               }
-                           }
-                       },
-                       failFast: true)
-           }
-       }*/
