@@ -96,12 +96,12 @@ pipeline {
                 echo 'INSIDE Sonar scan execution'
                 script {
                     //def mvnHome = tool 'Maven 3.3.9'
-                    withSonarQubeEnv {
+                   // withSonarQubeEnv {
                         
                         echo 'withSonarQubeEnv'
 
                         //sh "'mvn'  verify sonar:sonar -Dintegration-tests.skip=true -Dmaven.test.failure.ignore=true"
-                    }
+                    //}
                 }
                   echo 'LEAVING Sonar scan execution'
             }
