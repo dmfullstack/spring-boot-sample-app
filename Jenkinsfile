@@ -51,7 +51,7 @@ pipeline {
                         //print pom.version
                         echo 'Before junit testing'
                         // execute the unit testing and collect the reports
-                        junit '**//*target/surefire-reports/TEST-*.xml'
+                        //junit '**//*target/surefire-reports/TEST-*.xml'
                         archive 'target*//*.jar'
                         echo 'Leaving  Build with unit testing'
                     } else {
