@@ -9,9 +9,9 @@ pipeline {
     
     //{ label 'java8' }
     // global env variables
-    environment {
-        EMAIL_RECIPIENTS = 'mahmoud.romeh@test.com'
-    }
+    //environment {
+    //    EMAIL_RECIPIENTS = 'mahmoud.romeh@test.com'
+    //}
     stages {
         
     
