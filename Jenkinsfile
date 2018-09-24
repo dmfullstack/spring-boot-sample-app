@@ -44,9 +44,11 @@ pipeline {
                         echo 'Build Complete, getting pom details'
                         def pom = readMavenPom file: 'pom.xml'
                         // get the current development version
-                        developmentArtifactVersion = "${pom.version}-${targetVersion}"
-                        echo 'POM Version:'
-                        print pom.version
+                        //developmentArtifactVersion = "${pom.version}-${targetVersion}"
+                        developmentArtifactVersion = "$1.1-1.1"
+                        echo 'developmentArtifactVersion:'
+                        pring developmentArtifactVersion
+                        //print pom.version
                         echo 'Before junit testing'
                         // execute the unit testing and collect the reports
                         junit '**//*target/surefire-reports/TEST-*.xml'
