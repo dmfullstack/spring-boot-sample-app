@@ -110,17 +110,17 @@ pipeline {
         stage('Sonar scan result check') {
             steps {
                 echo 'INSIDE Sonar scan result check'
-                timeout(time: 2, unit: 'MINUTES') {
-                    retry(3) {
-                        script {
-                            def qg = waitForQualityGate()
-                            if (qg.status != 'OK') {
-                                error "Pipeline aborted due to quality gate failure: ${qg.status}"
-                            }
+                //timeout(time: 2, unit: 'MINUTES') {
+               //     retry(3) {
+                //        script {
+                  //          def qg = waitForQualityGate()
+                  //          if (qg.status != 'OK') {
+                  //              error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                   //         }
                             echo 'LEAVING Sonar scan result check'
-                        }
-                    }
-                }
+                     //   }
+                  //  }
+               // }
             }
         }
         stage('Development deploy approval and deployment') {
