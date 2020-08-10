@@ -242,9 +242,11 @@ pipeline {
 	}
 	post {
 		always {
+			/*
 			junit '**/surefire-reports/*.xml,**/test-results/**/*.xml'
 			archive "**/build/**/k8s/*.yml"
 			archive "**/target/**/k8s/*.yml"
+			*/
 		}
 	}
 }
